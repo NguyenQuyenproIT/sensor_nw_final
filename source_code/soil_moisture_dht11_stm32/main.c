@@ -10,6 +10,33 @@
 
 // ================= UART1 =================
 
+void UART2_Config(){
+    GPIO_InitTypeDef gpio_pin;
+    USART_InitTypeDef usart_init;
+
+    RCC_APB2PeriphClockCmd(RCC_APB2Periph_GPIOA, ENABLE);
+    RCC_APB1PeriphClockCmd(RCC_APB1Periph_USART2, ENABLE);
+
+    gpio_pin.GPIO_Pin = GPIO_Pin_2;
+    gpio_pin.GPIO_Mode = GPIO_Mode_AF_PP;
+    gpio_pin.GPIO_Speed = GPIO_Speed_50MHz;
+    GPIO_Init(GPIOA, &gpio_pin);
+
+    gpio_pin.GPIO_Pin = GPIO_Pin_3;
+    gpio_pin.GPIO_Mode = GPIO_Mode_IN_FLOATING;
+    gpio_pin.GPIO_Speed = GPIO_Speed_50MHz;
+    GPIO_Init(GPIOA, &gpio_pin);
+
+    usart_init.USART_BaudRate = 115200;
+    usart_init.USART_Mode = USART_Mode_Rx | USART_Mode_Tx;
+    usart_init.USART_WordLength = USART_WordLength_8b;
+    usart_init.USART_StopBits = USART_StopBits_1;
+    usart_init.USART_Parity = USART_Parity_No;
+    usart_init.USART_HardwareFlowControl = USART_HardwareFlowControl_None;
+    USART_Init(USART2, &usart_init);
+    USART_Cmd(USART2, ENABLE);
+}
+
 void UART1_Config(){
 
 	GPIO_InitTypeDef gpio;
@@ -87,9 +114,9 @@ void delay_ms(uint16_t ms){
 }
 
 
-// ================= DHT11 =================
+// ================= DHT22 =================
 
-void DHT11_GPIO_Config(){
+void DHT22_GPIO_Config(){
 
 	GPIO_InitTypeDef gpio;
 
@@ -102,7 +129,7 @@ void DHT11_GPIO_Config(){
 	GPIO_Init(GPIOB, &gpio);
 }
 
-void DHT11_Start(){
+void DHT22_Start(){
 
 	GPIO_InitTypeDef gpio;
 
@@ -125,71 +152,76 @@ void DHT11_Start(){
 	GPIO_Init(GPIOB, &gpio);
 }
 
-uint8_t DHT11_Read_Byte(){
+uint8_t DHT22_Read_Byte(void){
 
-	uint8_t i, byte = 0;
+	uint8_t i,byte=0;
 
-	for(i = 0; i < 8; i++){
+	for(i=0;i<8;i++)
+	{
+		while(GPIO_ReadInputDataBit(GPIOB,GPIO_Pin_12)==0);
 
-		while(GPIO_ReadInputDataBit(GPIOB, GPIO_Pin_12) == 0);
+		TIM_SetCounter(TIM2,0);
 
-		TIM_SetCounter(TIM2, 0);
-
-		while(GPIO_ReadInputDataBit(GPIOB, GPIO_Pin_12) == 1);
+		while(GPIO_ReadInputDataBit(GPIOB,GPIO_Pin_12)==1);
 
 		if(TIM_GetCounter(TIM2) > 40)
-			byte = (byte << 1) | 1;
-
+			byte = (byte<<1) | 1;
 		else
-			byte = (byte << 1);
+			byte = (byte<<1);
 	}
 
 	return byte;
 }
 
-uint8_t DHT11_Read_Data(uint8_t *hum_int,
-												uint8_t *hum_dec,
-												uint8_t *temp_int,
-												uint8_t *temp_dec){
+uint16_t temp_raw;
+uint16_t hum_raw;
 
-	uint8_t data[5];
+uint8_t DHT22_Read_Data(float *humidity, float *temperature){
+
+	uint8_t byte[5];
 	uint8_t i;
+	uint32_t timeout=0;
 
-	uint32_t timeout = 0;
-
-	while(GPIO_ReadInputDataBit(GPIOB, GPIO_Pin_12) == 1){
+	while(GPIO_ReadInputDataBit(GPIOB,GPIO_Pin_12)==1){
 		delay_us(1);
-		if(++timeout > 100) return 0;
+		if(++timeout>100) return 0;
 	}
 
-	timeout = 0;
-
-	while(GPIO_ReadInputDataBit(GPIOB, GPIO_Pin_12) == 0){
+	timeout=0;
+	while(GPIO_ReadInputDataBit(GPIOB,GPIO_Pin_12)==0){
 		delay_us(1);
-		if(++timeout > 100) return 0;
+		if(++timeout>100) return 0;
 	}
 
-	timeout = 0;
-
-	while(GPIO_ReadInputDataBit(GPIOB, GPIO_Pin_12) == 1){
+	timeout=0;
+	while(GPIO_ReadInputDataBit(GPIOB,GPIO_Pin_12)==1){
 		delay_us(1);
-		if(++timeout > 100) return 0;
+		if(++timeout>100) return 0;
 	}
 
-	for(i = 0; i < 5; i++){
+	for(i=0;i<5;i++)
+		byte[i]=DHT22_Read_Byte();
 
-		data[i] = DHT11_Read_Byte();
+	// checksum
+	if((uint8_t)(byte[0]+byte[1]+byte[2]+byte[3]) != byte[4])
+		return 0;
+
+	// ===== DHT22 FORMAT =====
+	 hum_raw  = (byte[0] << 8) | byte[1];
+	 temp_raw = (byte[2] << 8) | byte[3];
+
+	*humidity = hum_raw / 10.0f;
+
+	// sign bit (bit 15)
+	if(temp_raw & 0x8000){
+		temp_raw &= 0x7FFF;
+		*temperature = -(temp_raw / 10.0f);
+	}else{
+		*temperature = temp_raw / 10.0f;
 	}
 
-	*hum_int = data[0];
-	*hum_dec = data[1];
-
-	*temp_int = data[2];
-	*temp_dec = data[3];
-
-	return data[4];
+	return 1;
 }
-
 
 // ================= ADC SOIL =================
 
@@ -259,24 +291,41 @@ uint16_t Read_ADC_Average(){
 	return sum / 10;
 }
 
+void UART2_SendString(char *str)
+{
+    while(*str)
+    {
+        USART_SendData(USART2, *str++);
+        while(USART_GetFlagStatus(USART2, USART_FLAG_TXE) == RESET);
+    }
+}
+
+char buffer[120];
+
+void UART2_SendJSON(float temp, float hum, int soil)
+{
+    sprintf(buffer,
+            "{\"temp\":%.1f,\"hum\":%.1f,\"soil\":%d}\r\n",
+            temp, hum, soil);
+
+    UART2_SendString(buffer);
+}
 
 // ================= MAIN =================
 
+float humidity, temperature;
+uint8_t checksum;
+uint16_t adc_value;
+int moisture;
+
 int main(){
-
-	uint8_t hum_int, hum_dec;
-	uint8_t temp_int, temp_dec;
-	uint8_t checksum;
-
-	uint16_t adc_value;
-
-	int moisture;
-
+	
+	UART2_Config();
 	UART1_Config();
 
 	TIM2_Config();
 
-	DHT11_GPIO_Config();
+	DHT22_GPIO_Config();
 
 	ADC_Config();
 
@@ -285,41 +334,24 @@ int main(){
 	while(1){
 
 		// ===== Soil Moisture =====
-
 		adc_value = Read_ADC_Average();
-
 		moisture = (4095 - adc_value) * 100 / 4095;
-
-
-		// ===== DHT11 =====
-
-		DHT11_Start();
-
-		checksum = DHT11_Read_Data(&hum_int,
-															 &hum_dec,
-															 &temp_int,
-															 &temp_dec);
-
-
+		// ===== DHT22 =====
+		DHT22_Start();
+		checksum = DHT22_Read_Data(&humidity, &temperature);
 		// ===== Print =====
+	if(checksum)
+{
+		// fix bug - UART1
+    printf("Humi: %.1f %% | Temp: %.1f °C | Soil: %d %%\r\n",
+       humidity, temperature, moisture);
 
-		if((hum_int + hum_dec + temp_int + temp_dec) == checksum){
-
-			printf("Temp: %d.%d C | ",
-							temp_int,
-							temp_dec);
-
-			printf("Humidity: %d.%d %% | ",
-							hum_int,
-							hum_dec);
-
-			printf("Soil: %d %%\r\n",
-							moisture);
-		}
-		else{
-
-			printf("DHT11 checksum error!\r\n");
-		}
+    UART2_SendJSON(temperature, humidity, moisture);
+}
+else
+{
+    printf("{\"error\":\"dht\"}\r\n");
+}
 
 		delay_ms(2000);
 	}
