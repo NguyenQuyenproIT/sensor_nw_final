@@ -10,7 +10,7 @@ flowchart LR
     B --> C[UART2 JSON: temp, hum, soil]
     C --> D[ESP32 gateway]
     D --> E[parse JSON]
-    E --> F[mlp_predict(soil, temp, hum)]
+    E --> F["mlp_predict(soil, temp, hum)"]
     F --> G{Kết quả}
     G -->|WARNING| H[Bật LED cảnh báo]
     G -->|NORMAL| I[Tắt LED cảnh báo]
