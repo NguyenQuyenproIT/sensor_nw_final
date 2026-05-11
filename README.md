@@ -2,32 +2,43 @@
 
 Repo này là một hệ thống smart farming (mạng cảm biến) dùng STM32 và ESP32, kèm pipeline huấn luyện ML. Mục tiêu: thu thập dữ liệu đất/không khí, inference tại gateway ESP32 bằng model MLP, và đẩy telemetry lên ThingsBoard.
 
-## Tóm tắt luồng dữ liệu
+## Tóm tắt luồng dữ liệu (MLP-only)
 
 ```mermaid
 flowchart LR
-    A["Cảm biến đất / DHT22"] --> B["STM32 đọc ADC + nhiệt độ / độ ẩm"]
-    B --> C["UART2 JSON: temp, hum, soil"]
-    C --> D["ESP32 gateway"]
-    D --> E["parse JSON"]
-    E --> F["mlp_predict(soil, temp, hum)"]
-    F --> G{"Kết quả"}
-    G -->|WARNING| H["Bật LED cảnh báo"]
-    G -->|NORMAL| I["Tắt LED cảnh báo"]
-    G --> J["Telemetry ThingsBoard"]
-    H --> J
-    I --> J
+    subgraph Sensors
+        S1["Soil sensor (ADC)"]
+        S2["DHT22 / DHTxx (Temp & Hum)"]
+    end
+
+    S1 --> STM["STM32: read ADC & format JSON"]
+    S2 --> STM
+    STM --> ESP["ESP32 Gateway: parse & preprocess"]
+
+    ESP --> Scale["StandardScaler (scaler.pkl)"]
+    Scale --> MLP["MLP model (mlp_model.c / mlp_model.h)"]
+
+    MLP --> AI_DECIDE{"AI: WARNING?"}
+    AI_DECIDE -->|yes| LED["LED Alert (active-low)"]
+    AI_DECIDE -->|no| OK["No Alert"]
+
+    AI_DECIDE --> TB["ThingsBoard / MQTT telemetry"]
+    LED --> TB
+    OK --> TB
+
+    classDef gray fill:#f6f6f6,stroke:#ddd;
+    class Sensors gray;
 ```
 
 ```mermaid
 flowchart LR
-    A["source_csv/ CSV dữ liệu"] --> B["train_AI/Decision_Tree/train.py"]
-    A --> C["train_AI/MLP_TRAIN/train_mlp.py"]
-    B --> D["soil_model_dt.pkl"]
-    C --> E["mlp_model.pkl"]
-    C --> F["scaler.pkl"]
-    E --> G["ESP32 gateway"]
-    F --> G
+    Data["source_csv/*.csv"] --> Train["train_AI/MLP_TRAIN/train_mlp.py"]
+    Train --> ModelPKL["mlp_model.pkl"]
+    Train --> ScalerPKL["scaler.pkl"]
+    ModelPKL --> Export["Convert -> mlp_model.c/.h"]
+    ScalerPKL --> Export
+    Export --> Deploy["Copy to source_code/gateway_esp32/prj_lib/"]
+    Deploy --> ESP["ESP32 Gateway"]
 ```
 
 ## Nội dung chính và các thư mục
@@ -57,12 +68,11 @@ Thư mục `source_csv/` chứa các file CSV dùng cho huấn luyện và phân
 
 Lưu ý: Một số file có header `lable` (thiếu 'e'). Các script huấn luyện kỳ vọng `label` — đồng bộ tên cột trước khi train.
 
-### Huấn luyện ML
+### Huấn luyện ML (MLP)
 
-- Decision Tree: [train_AI/Decision_Tree/train.py](train_AI/Decision_Tree/train.py)
 - MLP: [train_AI/MLP_TRAIN/train_mlp.py](train_AI/MLP_TRAIN/train_mlp.py)
 
-MLP pipeline sẽ lưu `mlp_model.pkl` và `scaler.pkl` — khi deploy lên ESP32 cần export model sang C (có thư mục `source_code/gateway_esp32/prj_lib/mlp_model.*`).
+MLP pipeline sẽ lưu `mlp_model.pkl` và `scaler.pkl`. Để deploy lên ESP32: convert `mlp_model.pkl` thành `mlp_model.c`/`mlp_model.h` và copy vào `source_code/gateway_esp32/prj_lib/` cùng `scaler` (hoặc nhân bản logic scaler trên ESP32).
 
 ### Gateway ESP32
 
