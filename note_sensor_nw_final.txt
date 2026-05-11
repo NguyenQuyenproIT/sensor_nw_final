@@ -1,1 +1,10 @@
 token thingsboard: dtyj50xqwdq3515biw9l
+
+ESP32: TX 17 - STM32 RX PA3
+	   RX 16 -       TX PA2
+	 
+
+///// STM 32 ////	
+	
+DHT22: PB12
+SOIL MOISTURE: PA0
