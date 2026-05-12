@@ -3,8 +3,6 @@
 #include "timer_delay.h"
 #include "dht22.h"
 #include "adc_soil.h"
-#include "stm32f10x_usart.h"            // Keil::Device:StdPeriph Drivers:USART
-
 
 float humidity, temperature;
 uint8_t checksum;
