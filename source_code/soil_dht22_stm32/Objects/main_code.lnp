@@ -1,0 +1,20 @@
+--cpu Cortex-M3
+".\objects\main_code.o"
+".\objects\adc_soil.o"
+".\objects\dht22.o"
+".\objects\timer_delay.o"
+".\objects\uart.o"
+".\objects\misc.o"
+".\objects\stm32f10x_adc.o"
+".\objects\stm32f10x_exti.o"
+".\objects\stm32f10x_gpio.o"
+".\objects\stm32f10x_rcc.o"
+".\objects\stm32f10x_tim.o"
+".\objects\stm32f10x_usart.o"
+".\objects\gpio_stm32f10x.o"
+".\objects\startup_stm32f10x_md.o"
+".\objects\system_stm32f10x.o"
+--strict --scatter ".\Objects\main_code.sct"
+--summary_stderr --info summarysizes --map --load_addr_map_info --xref --callgraph --symbols
+--info sizes --info totals --info unused --info veneers
+--list ".\Listings\main_code.map" -o .\Objects\main_code.axf
