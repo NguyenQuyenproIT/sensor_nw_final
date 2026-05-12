@@ -149,7 +149,7 @@ static float activate_tanh(float x)
 }
 
 /*========================================================
-    MLP PREDICT
+    MLP PREDICT - 3 LAYER
 ========================================================*/
 
 float mlp_predict(float soil,
