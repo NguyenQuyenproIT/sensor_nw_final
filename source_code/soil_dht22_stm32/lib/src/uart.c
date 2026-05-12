@@ -1,5 +1,4 @@
-#include "stm32f10x_usart.h"            // Keil::Device:StdPeriph Drivers:USART
-
+#include "stm32f10x_usart.h"
 #include "uart.h"
 #include "stm32f10x_gpio.h"
 #include "stm32f10x_rcc.h"
