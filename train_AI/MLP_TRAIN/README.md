@@ -193,23 +193,23 @@ soil_moisture,temperature,humidity,label
 ┌─────────────────────────────────────────────────────────────┐
 │            HIDDEN LAYER 1 (16 neurons)                      │
 │    activation: tanh                                         │
-│    [N1][N2][N3][N4][N5][N6][N7][N8]                       │
-│    [N9][N10][N11][N12][N13][N14][N15][N16]               │
+│    [N1][N2][N3][N4][N5][N6][N7][N8]                         │
+│    [N9][N10][N11][N12][N13][N14][N15][N16]                  │
 └──────────────────────────┬──────────────────────────────────┘
                            │ (16 features)
                            ▼
 ┌─────────────────────────────────────────────────────────────┐
 │            HIDDEN LAYER 2 (8 neurons)                       │
 │    activation: tanh                                         │
-│    [N1][N2][N3][N4][N5][N6][N7][N8]                       │
+│    [N1][N2][N3][N4][N5][N6][N7][N8]                         │
 └──────────────────────────┬──────────────────────────────────┘
                            │ (8 features)
                            ▼
 ┌─────────────────────────────────────────────────────────────┐
 │             OUTPUT LAYER (2 neurons)                        │
 │    activation: softmax (cho classification)                 │
-│           [Group_A]   [Group_B]                            │
-│    Xác suất: P(A)     P(B)                                 │
+│           [Group_A]   [Group_B]                             │
+│    Xác suất: P(A)     P(B)                                  │
 └─────────────────────────────────────────────────────────────┘
 ```
 
@@ -693,9 +693,9 @@ Khi hài lòng:
 
 ---
 
-## 📞 Hỗ Trợ & Liên Hệ
+## Nếu gặp vấn đề:
 
-Nếu gặp vấn đề:
+
 
 1. **Lỗi import**: Cài đặt lại thư viện
    ```bash
@@ -715,13 +715,7 @@ Nếu gặp vấn đề:
 
 ## 📚 Tham Khảo & Học Thêm
 
-- [scikit-learn MLPClassifier](https://scikit-learn.org/stable/modules/generated/sklearn.neural_network.MLPClassifier.html)
 - [Neural Networks - Basics](https://towardsdatascience.com/understanding-neural-networks-what-why-and-how-18ec859eadf8)
 - [Machine Learning Course](https://www.coursera.org/learn/machine-learning)
 
----
-
-**Tạo bởi**: Hệ Thống MLP_TRAIN  
-**Phiên bản**: 1.0  
-**Ngày cập nhật**: 2026-05-12
 
