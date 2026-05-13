@@ -15,7 +15,7 @@ from sklearn.metrics import (
 # 1. READ DATA
 # =====================================================
 
-df = pd.read_csv("soil_data.csv")
+df = pd.read_csv("soil_data_ver3.csv")
 
 # SHUFFLE DATA
 df = df.sample(frac=1, random_state=42).reset_index(drop=True)
