@@ -1,199 +1,178 @@
+hãy nói yêu cầu cụ thể, tôi sẽ tiếp tục.
 # SENSOR_NW_FINAL
 
-Repo này là một hệ thống smart farming (mạng cảm biến) dùng STM32 và ESP32, kèm pipeline huấn luyện ML. Mục tiêu: thu thập dữ liệu đất/không khí, inference tại gateway ESP32 bằng model MLP, và đẩy telemetry lên ThingsBoard.
+Repo này là một hệ thống smart farming / sensor network gồm 2 firmware nhúng, pipeline huấn luyện machine learning và phần thiết kế mạch. Mục tiêu là đọc dữ liệu độ ẩm đất, nhiệt độ, độ ẩm không khí, đưa dữ liệu qua STM32 sang ESP32, chạy suy luận MLP tại gateway, rồi đẩy telemetry lên ThingsBoard để giám sát và cảnh báo.
 
-## Tóm tắt luồng dữ liệu (MLP-only)
+## Tổng Quan
+
+Luồng chạy thực tế của project hiện tại:
+
+1. STM32 đọc cảm biến đất và DHT22.
+2. STM32 đóng gói dữ liệu thành JSON và gửi qua UART2.
+3. ESP32 nhận JSON qua `Serial2`, parse dữ liệu và gọi model MLP.
+4. ESP32 quyết định bật hoặc tắt LED cảnh báo, đồng thời gửi telemetry lên ThingsBoard qua MQTT.
+5. Mô hình MLP được train từ dữ liệu CSV trong `source_csv/` và có thể export sang C để nhúng vào ESP32.
 
 ```mermaid
 flowchart LR
-    subgraph Sensors
-        S1["Soil sensor (ADC)"]
-        S2["DHT22 / DHTxx (Temp & Hum)"]
+    subgraph STM32 Side
+        Soil["ADC soil moisture\nPA0"]
+        DHT["DHT22 temp/humidity\nPB12"]
+        STM["STM32F103C8\nFormat JSON -> UART2"]
     end
 
-    S1 --> STM["STM32: read ADC & format JSON"]
-    S2 --> STM
-    STM --> ESP["ESP32 Gateway: parse & preprocess"]
+    Soil --> STM
+    DHT --> STM
 
-    ESP --> Scale["StandardScaler (scaler.pkl)"]
-    Scale --> MLP["MLP model (mlp_model.c / mlp_model.h)"]
-
-    MLP --> AI_DECIDE{"AI: WARNING?"}
-    AI_DECIDE -->|yes| LED["LED Alert (active-low)"]
-    AI_DECIDE -->|no| OK["No Alert"]
-
-    AI_DECIDE --> TB["ThingsBoard / MQTT telemetry"]
-    LED --> TB
-    OK --> TB
-
-    classDef gray fill:#f6f6f6,stroke:#ddd;
-    class Sensors gray;
+    STM --> ESP["ESP32 Gateway\nParse JSON + AI"]
+    ESP --> LED["LED Warning\nactive-low"]
+    ESP --> MQTT["ThingsBoard MQTT"]
 ```
 
 ```mermaid
 flowchart LR
-    Data["source_csv/*.csv"] --> Train["train_AI/MLP_TRAIN/train_mlp.py"]
-    Train --> ModelPKL["mlp_model.pkl"]
-    Train --> ScalerPKL["scaler.pkl"]
-    ModelPKL --> Export["Convert -> mlp_model.c/.h"]
-    ScalerPKL --> Export
-    Export --> Deploy["Copy to source_code/gateway_esp32/prj_lib/"]
-    Deploy --> ESP["ESP32 Gateway"]
+    CSV["source_csv/*.csv"] --> TRAIN["train_AI/MLP_TRAIN/train_mlp.py"]
+    TRAIN --> PKL["mlp_model.pkl"]
+    TRAIN --> SCALER["scaler.pkl"]
+    PKL --> EXPORT["C export / embed into ESP32"]
+    SCALER --> EXPORT
+    EXPORT --> GATEWAY["source_code/gateway_esp32"]
 ```
 
-## Nội dung chính và các thư mục
-
-- [source_csv](source_csv): dữ liệu nguồn và dữ liệu có gán nhãn.
-- [train_AI](train_AI): pipeline huấn luyện (Decision Tree và MLP).
-- [source_code](source_code): firmware STM32 và gateway ESP32.
-
-Cấu trúc tổng quát:
+## Cấu Trúc Thư Mục
 
 ```text
 sensor_nw_final/
 ├── circuit_design/
-├── documents/
+│   └── lib/                     # Thư viện mạch Altium
+├── documents/                   # Tài liệu liên quan ESP / MQTT
 ├── source_code/
-├── source_csv/
-└── train_AI/
+│   ├── gateway_esp32/           # Firmware ESP32 Gateway
+│   └── soil_dht22_stm32/        # Firmware STM32F103C8
+├── source_csv/                  # Dataset CSV dùng để train / test
+├── train_AI/                    # Script train và inspect model
+├── README.md
+└── note_sensor_nw_final.txt
 ```
 
-### Thiết kế phần cứng
+### Nội Dung Từng Khu Vực
 
-Thư mục `circuit_design/` chứa thư viện mạch (ví dụ `DEVKIT_V1_ESP32-WROOM-32.IntLib`, `Stm32 Blue Pill.IntLib`). Đây là tài nguyên thiết kế, không phải code chạy.
+- `circuit_design/`: thư viện mạch cho ESP32 DevKit V1, STM32 Blue Pill và cảm biến DHT.
+- `documents/`: tài liệu tham khảo theo nhóm chủ đề như ESP và MQTT.
+- `source_code/`: toàn bộ firmware nhúng cho STM32 và ESP32.
+- `source_csv/`: dữ liệu đầu vào để xây dựng mô hình học máy.
+- `train_AI/`: script huấn luyện, đọc model và kiểm tra model.
 
-### Dữ liệu
+## Phần Cứng Và Kết Nối
 
-Thư mục `source_csv/` chứa các file CSV dùng cho huấn luyện và phân tích, ví dụ `Smart_Farming_Smart_Labeled.csv`.
+### STM32F103C8
 
-Lưu ý: Một số file có header `lable` (thiếu 'e'). Các script huấn luyện kỳ vọng `label` — đồng bộ tên cột trước khi train.
+Firmware STM32 trong `source_code/soil_dht22_stm32/` dùng các ngoại vi sau:
 
-### Huấn luyện ML (MLP)
+- `PA0`: ADC đọc độ ẩm đất.
+- `PB12`: chân dữ liệu của DHT22.
+- `USART1`: debug ra serial monitor.
+- `USART2`: gửi JSON sang ESP32.
+- `TIM2`: tạo delay microsecond cho giao tiếp DHT.
 
-- MLP: [train_AI/MLP_TRAIN/train_mlp.py](train_AI/MLP_TRAIN/train_mlp.py)
+### ESP32 DevKit V1
 
-MLP pipeline sẽ lưu `mlp_model.pkl` và `scaler.pkl`. Để deploy lên ESP32: convert `mlp_model.pkl` thành `mlp_model.c`/`mlp_model.h` và copy vào `source_code/gateway_esp32/prj_lib/` cùng `scaler` (hoặc nhân bản logic scaler trên ESP32).
+Gateway ESP32 trong `source_code/gateway_esp32/` dùng:
 
-### Gateway ESP32
+- UART nhận dữ liệu từ STM32 qua `Serial2`.
+- Wi-Fi để kết nối mạng.
+- MQTT để gửi telemetry lên ThingsBoard.
+- LED cảnh báo ở chân `GPIO13`.
 
-File chính: [source_code/gateway_esp32/src/main.cpp](source_code/gateway_esp32/src/main.cpp)
+### Kết Nối Logic
 
-Chức năng chính của gateway:
-1. Kết nối Wi-Fi và MQTT/ThingsBoard.
-2. Đọc JSON từ `Serial2` (STM32 gửi): `{"temp":...,"hum":...,"soil":...}`.
-3. Parse dữ liệu, gọi `mlp_predict(soil, temp, hum)` và quyết định `WARNING`/`NORMAL`.
-4. Bật/tắt LED cảnh báo và gửi telemetry.
+- STM32 gửi dữ liệu qua UART2 ở tốc độ `115200`.
+- ESP32 đọc đúng từng dòng JSON kết thúc bằng ký tự xuống dòng.
+- LED cảnh báo đang dùng logic active-low, tức là `LOW` sẽ bật LED và `HIGH` sẽ tắt LED.
 
-Ghi chú kỹ thuật:
-- LED cảnh báo sử dụng active-low (kiểm tra sơ đồ hoặc mã nguồn để xác nhận).
-- ESP32 có file `include/mlp_model.h` và `prj_lib/mlp_model.c` chứa hàm `mlp_predict` nếu model được nhúng dưới dạng mã C.
+## Firmware STM32
 
-### Firmware STM32
+File chính: [source_code/soil_dht22_stm32/main_code.c](source_code/soil_dht22_stm32/main_code.c)
 
-Các project firmware nằm trong `source_code/soil_moisture_stm32/` và `source_code/soil_moisture_dht11_stm32/`.
+### Vai Trò
 
-- `soil_moisture_stm32`: đọc ADC đất, in giá trị để debug.
-- `soil_moisture_dht11_stm32`: đọc ADC đất + DHT (nhiệt độ/độ ẩm), gửi JSON qua UART2.
+Firmware này là lớp thu thập dữ liệu đầu vào cho hệ thống AI. Nó đọc dữ liệu từ cảm biến đất và DHT22, sau đó đóng gói thành JSON để ESP32 xử lý tiếp.
 
-Ví dụ JSON gửi từ STM32:
+### Luồng Xử Lý
+
+1. Khởi tạo `UART2_Config()` để gửi dữ liệu sang ESP32.
+2. Khởi tạo `UART1_Config()` để debug.
+3. Khởi tạo `TIM2_Config()` để phục vụ delay chính xác.
+4. Khởi tạo `DHT22_GPIO_Config()` và `ADC_Config()`.
+5. Đọc độ ẩm đất bằng `Soil_Moisture_Percent()`.
+6. Đọc DHT22 bằng `DHT22_Start()` và `DHT22_Read_Data()`.
+7. Nếu dữ liệu hợp lệ, in ra debug và gửi JSON qua UART2.
+8. Nếu DHT lỗi, gửi JSON lỗi `{"error":"dht"}` ra debug.
+
+### Format Dữ Liệu Gửi Sang ESP32
+
+JSON được tạo bởi hàm `UART2_SendJSON()` có dạng:
 
 ```json
 {"temp":32.1,"hum":70.2,"soil":45}
 ```
 
-Nếu DHT đọc lỗi, firmware trả về: `{"error":"dht"}`.
+Trong đó:
 
-### Lưu ý về naming và artefact
+- `temp`: nhiệt độ môi trường.
+- `hum`: độ ẩm không khí.
+- `soil`: độ ẩm đất theo phần trăm.
 
-- Không commit các artefact build (thư mục `Objects/`, `Listings/`, file `.axf`, `.d`, ...).
-- Các model và file deploy (`mlp_model.pkl`, `mlp_model.c`, `mlp_model.h`, `scaler.pkl`) nên tách rõ `deploy/` nếu cần.
+### Chi Tiết Cảm Biến
 
-## Hướng dẫn nhanh
+- DHT22 được đọc theo kiểu bit-banging trên `PB12`.
+- Driver hiện tại có kiểm tra checksum 5 byte.
+- ADC đất lấy trung bình 10 mẫu để giảm nhiễu.
+- Hàm quy đổi độ ẩm đất đang map ADC 12-bit sang phần trăm theo công thức tuyến tính.
 
-1. Huấn luyện MLP (ví dụ):
+### File Hỗ Trợ STM32
 
-```bash
-python train_AI/MLP_TRAIN/train_mlp.py
-```
-
-2. Chuyển `mlp_model` sang code C (nếu cần) và copy vào `source_code/gateway_esp32/prj_lib/`.
-
-3. Build và flash firmware STM32 bằng Keil/MDK hoặc toolchain tương ứng.
-
-4. Build và flash ESP32 bằng PlatformIO (mở [source_code/gateway_esp32/platformio.ini](source_code/gateway_esp32/platformio.ini)).
-
-## Các vấn đề thường gặp
-
-- Mermaid trên GitHub/GitLab có thể lỗi khi label chứa dấu phẩy hoặc ký tự đặc biệt — hãy đặt label trong dấu nháy đôi như trong file này.
-- Đồng bộ tên cột `label`/`lable` giữa CSV và script huấn luyện.
-- Kiểm tra tốc độ `Serial` (115200) và format JSON giữa STM32 và ESP32.
-
-## Muốn tôi làm thêm?
-
-Nếu bạn muốn tôi:
-- xuất `mlp_model` thành mã C (`mlp_model.c`/`mlp_model.h`),
-- sửa script train để chấp nhận header `lable`,
-- hoặc tạo hướng dẫn deploy chi tiết,
-
-hãy nói yêu cầu cụ thể, tôi sẽ tiếp tục.
-
-
-Đây là firmware dùng 2 nguồn dữ liệu:
-
-- độ ẩm đất từ ADC `PA0`
-- nhiệt độ / độ ẩm không khí từ cảm biến họ DHT trên `PB12`
-
-Điểm cần nói rõ: tên thư mục là `dht11`, nhưng code hiện tại đang đọc theo format DHT22. Nếu phần cứng thực tế là DHT11 thì cần chỉnh lại phần đọc dữ liệu cho khớp.
-
-Luồng xử lý:
-
-1. Khởi tạo `USART1` để debug và `USART2` để gửi dữ liệu sang ESP32.
-2. Khởi tạo `TIM2` để tạo delay chính xác cho giao tiếp bit-banging.
-3. Đọc DHT trên `PB12`, kiểm tra checksum.
-4. Đọc ADC đất và lấy trung bình 10 mẫu.
-5. Nếu dữ liệu hợp lệ, in ra serial và gửi JSON qua UART2.
-
-JSON được gửi sang gateway có dạng:
-
-```json
-{"temp":32.1,"hum":70.2,"soil":45}
-```
-
-Nếu đọc DHT lỗi, firmware trả về JSON lỗi:
-
-```json
-{"error":"dht"}
-```
-
-### Mối liên kết giữa 2 firmware STM32
-
-- `soil_moisture_stm32` là bản đọc đất đơn giản để test cảm biến.
-- `soil_moisture_dht11_stm32` là bản có đủ dữ liệu để đẩy sang ESP32 và chạy AI.
-
-Nếu mục tiêu là chạy end-to-end, luồng đúng là dùng bản có DHT + soil để xuất JSON cho ESP32.
+- [source_code/soil_dht22_stm32/lib/inc/uart.h](source_code/soil_dht22_stm32/lib/inc/uart.h)
+- [source_code/soil_dht22_stm32/lib/src/uart.c](source_code/soil_dht22_stm32/lib/src/uart.c)
+- [source_code/soil_dht22_stm32/lib/inc/dht22.h](source_code/soil_dht22_stm32/lib/inc/dht22.h)
+- [source_code/soil_dht22_stm32/lib/src/dht22.c](source_code/soil_dht22_stm32/lib/src/dht22.c)
+- [source_code/soil_dht22_stm32/lib/inc/adc_soil.h](source_code/soil_dht22_stm32/lib/inc/adc_soil.h)
+- [source_code/soil_dht22_stm32/lib/src/adc_soil.c](source_code/soil_dht22_stm32/lib/src/adc_soil.c)
 
 ## Gateway ESP32
 
 File chính: [source_code/gateway_esp32/src/main.cpp](source_code/gateway_esp32/src/main.cpp)
 
-Project này dùng PlatformIO với cấu hình Arduino, MQTT và JSON:
+### Vai Trò
+
+ESP32 là gateway trung tâm của hệ thống. Nó nhận JSON từ STM32, suy luận bằng model MLP, điều khiển LED cảnh báo và gửi telemetry lên ThingsBoard.
+
+### Cấu Hình Build
+
+File cấu hình: [source_code/gateway_esp32/platformio.ini](source_code/gateway_esp32/platformio.ini)
+
+Các thông số chính:
 
 - board: `esp32doit-devkit-v1`
+- framework: `arduino`
 - monitor speed: `115200`
-- thư viện chính: `PubSubClient`, `ArduinoJson`
+- thư viện MQTT: `PubSubClient`
+- thư viện JSON: `ArduinoJson` phiên bản 7.x
 
-Luồng runtime của ESP32:
+### Luồng Runtime
 
 1. Kết nối Wi-Fi.
-2. Kết nối MQTT / ThingsBoard.
-3. Đọc từng dòng JSON từ `Serial2` nhận từ STM32.
-4. Parse 3 trường bắt buộc: `temp`, `hum`, `soil`.
+2. Kết nối MQTT đến ThingsBoard.
+3. Lắng nghe dữ liệu từ `Serial2`.
+4. Parse JSON và kiểm tra đủ 3 trường bắt buộc: `temp`, `hum`, `soil`.
 5. Gọi `mlp_predict((float)soil, temp, hum)`.
-6. Nếu prediction > `0.0f`, gán trạng thái `WARNING` và bật LED cảnh báo.
-7. Nếu không, gán trạng thái `NORMAL` và tắt LED.
-8. Gửi telemetry gồm sensor data, prediction, trạng thái AI và trạng thái LED lên ThingsBoard.
+6. Nếu prediction lớn hơn `0.0f`, hệ thống gán trạng thái `WARNING` và bật LED.
+7. Nếu không, hệ thống gán trạng thái `NORMAL` và tắt LED.
+8. Gửi telemetry sang ThingsBoard.
 
-Gateway hiện đang đọc đúng format JSON từ STM32 và không còn là đoạn demo rời rạc. Các trường telemetry được gửi đi gồm:
+### Telemetry Gửi Lên ThingsBoard
+
+Các field telemetry hiện tại gồm:
 
 - `temperature`
 - `humidity`
@@ -201,63 +180,211 @@ Gateway hiện đang đọc đúng format JSON từ STM32 và không còn là đ
 - `prediction`
 - `ai_state`
 - `led_state`
+- `control_mode`
+- `manual_state`
 
-Lưu ý quan trọng:
+### Chế Độ Điều Khiển
 
-- LED cảnh báo đang dùng logic active-low.
-- ESP32 phụ thuộc vào model MLP đã được build sẵn trong project qua `mlp_model.h` / `mlp_model.c`.
-- Nếu STM32 không gửi JSON đúng format, gateway sẽ báo `PARSE FAIL`.
+Gateway đã có hỗ trợ RPC từ ThingsBoard để chuyển đổi chế độ điều khiển.
 
-## Train model
+Các RPC method đang được xử lý:
 
-### `train_AI/Decision_Tree/train.py`
+- `setControlMode`: đổi giữa `AI` và `MANUAL`.
+- `setManualState`: bật/tắt LED khi đang ở chế độ manual.
+- `getControlMode`: trả về chế độ hiện tại.
+- `getManualState`: trả về trạng thái LED manual.
 
-File: [train_AI/Decision_Tree/train.py](train_AI/Decision_Tree/train.py)
+Khi ở chế độ manual:
 
-Mục đích của pipeline này là train cây quyết định để phân loại trạng thái tưới dựa trên 3 feature:
+- `ON` sẽ kéo LED xuống `LOW`.
+- `OFF` sẽ đưa LED về `HIGH`.
+
+Khi ở chế độ AI:
+
+- ESP32 đọc output từ model và quyết định trạng thái LED tự động.
+
+### Model Nhúng Trên ESP32
+
+Header model: [source_code/gateway_esp32/include/mlp_model.h](source_code/gateway_esp32/include/mlp_model.h)
+
+Model C dùng hàm:
+
+- `float mlp_predict(float soil, float temp, float hum);`
+- `uint8_t mlp_classify(float soil, float temp, float hum);`
+
+Những file model C thường được lưu trong `source_code/gateway_esp32/` để build cùng project. Khi thay model mới, cần giữ đồng bộ giữa header và source model.
+
+## Pipeline Huấn Luyện MLP
+
+Thư mục: [train_AI/MLP_TRAIN](train_AI/MLP_TRAIN)
+
+### Mục Tiêu
+
+Pipeline này dùng dữ liệu CSV để train mô hình MLP cho bài toán phân loại / ra quyết định tưới dựa trên 3 feature:
 
 - `soil_moisture`
 - `temperature`
 - `humidity`
 
-Luồng train:
+### File Chính
 
-1. Đọc CSV.
-2. Kiểm tra dữ liệu đầu vào.
+- [train_AI/MLP_TRAIN/train_mlp.py](train_AI/MLP_TRAIN/train_mlp.py): script train model.
+- [train_AI/MLP_TRAIN/read_model.py](train_AI/MLP_TRAIN/read_model.py): đọc model và scaler.
+- [train_AI/MLP_TRAIN/inspect_model.py](train_AI/MLP_TRAIN/inspect_model.py): kiểm tra chi tiết trọng số / bias / scaler.
+
+### Dataset Đang Dùng
+
+Script hiện tại đọc file `soil_data_ver3.csv` trong cùng thư mục train. Dữ liệu đầu vào phải có các cột:
+
+- `soil_moisture`
+- `temperature`
+- `humidity`
+- `label`
+
+Lưu ý quan trọng: trong một số file CSV cũ có thể xuất hiện header `lable` thay vì `label`. Trước khi train, hãy đồng bộ lại tên cột để tránh lỗi đọc dữ liệu hoặc train sai nhãn.
+
+### Các Bước Train Trong `train_mlp.py`
+
+1. Đọc dữ liệu bằng `pandas`.
+2. Xáo trộn dữ liệu với `random_state=42`.
 3. Tách `X` và `y`.
-4. Chia train/test theo tỉ lệ 80/20.
-5. Train `DecisionTreeClassifier`.
-6. Đánh giá bằng accuracy, classification report và confusion matrix.
-7. In luật cây và feature importance.
-8. Lưu model ra `soil_model_dt.pkl`.
-
-File trong folder hiện có thể dùng để đối chiếu nhanh kết quả tree và giải thích logic ra quyết định.
-
-### `train_AI/MLP_TRAIN/train_mlp.py`
-
-File: [train_AI/MLP_TRAIN/train_mlp.py](train_AI/MLP_TRAIN/train_mlp.py)
-
-Đây là pipeline MLP để học quan hệ phi tuyến mạnh hơn.
-
-Luồng train:
-
-1. Đọc CSV.
-2. Xáo trộn dữ liệu.
-3. Tách `X` và `y`.
-4. Chia train/test.
+4. Chia train/test theo tỷ lệ `80/20` với stratify.
 5. Chuẩn hóa feature bằng `StandardScaler`.
-6. Train `MLPClassifier`.
-7. Đánh giá model.
-8. Lưu `mlp_model.pkl` và `scaler.pkl`.
+6. Train `MLPClassifier` với cấu hình:
+   - hidden layers: `(16, 8)`
+   - activation: `tanh`
+   - solver: `adam`
+   - learning rate init: `0.001`
+   - max_iter: `5000`
+   - early_stopping: `True`
+7. Đánh giá model bằng accuracy, classification report và confusion matrix.
+8. Lưu model ra `mlp_model.pkl`.
+9. Lưu scaler ra `scaler.pkl`.
 
-Các file hỗ trợ trong cùng folder:
+### Ý Nghĩa Của `scaler.pkl`
 
-- [train_AI/MLP_TRAIN/read_model.py](train_AI/MLP_TRAIN/read_model.py)
-- [train_AI/MLP_TRAIN/inspect_model.py](train_AI/MLP_TRAIN/inspect_model.py)
+Model MLP chỉ nên suy luận đúng khi dữ liệu đầu vào đã được chuẩn hóa giống lúc train. Vì vậy, khi deploy lên ESP32, phải giữ `scaler.pkl` hoặc tái hiện đúng logic scale trong firmware.
 
-Điểm bắt buộc của MLP:
+### Chức Năng Của `read_model.py`
 
-- phải đi kèm `scaler.pkl` khi suy luận
+Script này dùng để:
+
+- nạp `mlp_model.pkl`.
+- nạp `scaler.pkl`.
+- in ra số lớp ẩn, activation.
+- in weights và bias của từng layer.
+- in mean và standard deviation của scaler.
+
+### Chức Năng Của `inspect_model.py`
+
+Script này phù hợp khi cần xem sâu hơn cấu trúc model, kiểm tra layer và xác minh rằng model đã train đúng cấu hình mong muốn trước khi export sang firmware.
+
+## Hướng Dẫn Chạy Nhanh
+
+### 1. Chuẩn Bị Python Environment
+
+Trong folder train, cài các package cần thiết:
+
+```bash
+pip install pandas scikit-learn joblib
+```
+
+### 2. Train MLP
+
+Chạy script train:
+
+```bash
+python train_AI/MLP_TRAIN/train_mlp.py
+```
+
+Sau khi train xong, bạn sẽ có:
+
+- `mlp_model.pkl`
+- `scaler.pkl`
+
+### 3. Kiểm Tra Model
+
+Nếu muốn in thông tin model và scaler:
+
+```bash
+python train_AI/MLP_TRAIN/read_model.py
+```
+
+### 4. Build STM32
+
+Mở project `source_code/soil_dht22_stm32/` bằng Keil MDK hoặc toolchain tương thích STM32F1, sau đó build và flash lên board STM32F103C8.
+
+### 5. Build ESP32
+
+Mở [source_code/gateway_esp32/platformio.ini](source_code/gateway_esp32/platformio.ini) bằng VS Code + PlatformIO, rồi build / upload firmware ESP32.
+
+### 6. Cập Nhật Thông Tin Kết Nối
+
+Trước khi nạp thật, hãy thay các giá trị sau trong `main.cpp`:
+
+- Wi-Fi SSID / password.
+- ThingsBoard token.
+- Nếu cần, chỉnh chân LED hoặc chân UART theo wiring thực tế.
+
+## Gợi Ý Deploy End-To-End
+
+1. Flash STM32 trước để kiểm tra dữ liệu serial debug và JSON UART2.
+2. Mở Serial Monitor của ESP32 ở `115200` để xác nhận gateway nhận được JSON.
+3. Nếu gateway báo `PARSE FAIL`, kiểm tra lại format JSON từ STM32.
+4. Nếu AI luôn ra warning hoặc luôn normal, kiểm tra lại model, scaler và ngưỡng quyết định `prediction > 0.0f`.
+5. Nếu ThingsBoard không nhận telemetry, kiểm tra token, server, topic MQTT và kết nối Wi-Fi.
+
+## Lưu Ý Kỹ Thuật Quan Trọng
+
+- Project đang có nhiều file artifact build trong `source_code/soil_dht22_stm32/Objects/` và `Listings/`. Các file này chỉ là output build, không phải source logic.
+- Không nên commit thông tin đăng nhập Wi-Fi hoặc token thật vào README công khai.
+- Gateway ESP32 phụ thuộc chặt vào format JSON mà STM32 gửi ra.
+- Nếu sửa tên field trong JSON, phải sửa đồng bộ ở cả STM32 lẫn ESP32.
+- Nếu thay dataset, cần kiểm tra lại tên cột `label` và thứ tự feature `soil_moisture`, `temperature`, `humidity`.
+
+## Vấn Đề Thường Gặp
+
+### 1. ESP32 Không Nhận Được Dữ Liệu Từ STM32
+
+- Kiểm tra dây nối UART TX/RX.
+- Kiểm tra chung GND giữa hai board.
+- Kiểm tra tốc độ baud đang là `115200` ở cả hai phía.
+- Đảm bảo JSON có ký tự xuống dòng kết thúc.
+
+### 2. STM32 Báo Lỗi DHT
+
+- Kiểm tra wiring của DHT22.
+- Kiểm tra pull-up cho chân dữ liệu.
+- Kiểm tra nguồn cấp và delay bit-banging.
+
+### 3. Model Không Cho Kết Quả Như Mong Muốn
+
+- Kiểm tra file CSV đầu vào.
+- Kiểm tra `scaler.pkl` có đi kèm model hay không.
+- Kiểm tra model export sang C có đúng hệ số và hàm kích hoạt.
+
+### 4. ThingsBoard Không Có Telemetry
+
+- Kiểm tra `TB_SERVER`, `TB_PORT`, `TB_TOKEN` trong ESP32.
+- Kiểm tra topic `v1/devices/me/telemetry`.
+- Kiểm tra Wi-Fi đã kết nối ổn định chưa.
+
+## Tóm Tắt Ngắn Gọn Theo Chức Năng
+
+- `source_code/soil_dht22_stm32/`: đọc cảm biến và xuất JSON.
+- `source_code/gateway_esp32/`: nhận JSON, chạy MLP, điều khiển LED, gửi ThingsBoard.
+- `train_AI/MLP_TRAIN/`: train model và inspect scaler / weights.
+- `source_csv/`: dữ liệu để train.
+- `circuit_design/`: thư viện mạch và tài nguyên thiết kế phần cứng.
+
+## Nếu Bạn Muốn Mở Rộng Tiếp
+
+Tôi có thể tiếp tục giúp bạn:
+
+1. viết lại README theo phong cách ngắn gọn hơn cho GitHub.
+2. bổ sung sơ đồ wiring chân nối STM32 với ESP32 và cảm biến.
+3. chuẩn hóa lại phần train model để khớp hoàn toàn với firmware hiện tại.
+4. thêm hướng dẫn export `mlp_model.pkl` sang `mlp_model.c` / `mlp_model.h`.
 - input phải giữ đúng thứ tự `soil_moisture`, `temperature`, `humidity`
 
 ## Dữ liệu và điểm cần chú ý
