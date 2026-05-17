@@ -149,7 +149,7 @@ static float activate_tanh(float x)
 }
 
 /*========================================================
-    MLP PREDICT - 3 LAYER
+    MLP PREDICT - 3 LAYER (suy luận - inference)
 ========================================================*/
 
 float mlp_predict(float soil,

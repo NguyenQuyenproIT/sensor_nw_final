@@ -11,18 +11,19 @@ extern "C" {
 // =====================================================
 // WIFI / THINGSBOARD
 // =====================================================
-// #define WIFI_SSID      "QUYEN"
-// #define WIFI_PASSWORD  "66668888"
+#define WIFI_SSID      "QUYEN"
+#define WIFI_PASSWORD  "66668888"
 
-#define WIFI_SSID      "FULL A+"
-#define WIFI_PASSWORD  "matkhaugi"
+// #define WIFI_SSID      "FULL A+"
+// #define WIFI_PASSWORD  "matkhaugi"
 
 #define TB_SERVER      "thingsboard.cloud"
 #define TB_PORT        1883
 #define TB_TOKEN       "dtyj50xqwdq3515biw9l"
 
 #define TELEMETRY_TOPIC "v1/devices/me/telemetry"
-#define RPC_REQUEST_TOPIC "v1/device2s/me/rpc/request/+"
+// #define RPC_REQUEST_TOPIC "v1/device2s/me/rpc/request/+"
+#define RPC_REQUEST_TOPIC "v1/devices/me/rpc/request/+"
 
 // =====================================================
 // LED WARNING
@@ -170,6 +171,31 @@ void wifiConnect()
     Serial.println("\nWiFi OK");
 }
 
+// void wifiConnect()
+// {
+//     WiFi.mode(WIFI_STA);
+//     WiFi.begin(WIFI_SSID, WIFI_PASSWORD);
+
+//     Serial.print("WiFi connecting");
+
+//     unsigned long start = millis();
+//     while (WiFi.status() != WL_CONNECTED && millis() - start < 10000)
+//     {
+//         delay(500);
+//         Serial.print(".");
+//     }
+
+//     if (WiFi.status() == WL_CONNECTED)
+//     {
+//         Serial.println("\nWiFi OK");
+//     }
+//     else
+//     {
+//         Serial.println("\nWiFi FAIL");
+//     }
+// }
+
+
 void mqttConnect()
 {
     mqtt.setServer(TB_SERVER, TB_PORT);
@@ -193,11 +219,45 @@ void mqttConnect()
     }
 }
 
+// bool mqttConnect()
+// {
+//     mqtt.setServer(TB_SERVER, TB_PORT);
+//     mqtt.setCallback(mqttCallback);
+
+//     if (mqtt.connected())
+//         return true;
+
+//     Serial.print("MQTT connecting...");
+
+//     if (mqtt.connect("ESP32_AI_Client", TB_TOKEN, NULL))
+//     {
+//         Serial.println("OK");
+//         mqtt.subscribe(RPC_REQUEST_TOPIC);
+//         return true;
+//     }
+//     else
+//     {
+//         Serial.print("FAIL rc=");
+//         Serial.println(mqtt.state());
+//         return false;
+//     }
+// }
+
+
 void mqttLoop()
 {
     if (!mqtt.connected()) mqttConnect();
     mqtt.loop();
 }
+
+// void mqttLoop()
+// {
+//     if (!mqtt.connected())
+//     {
+//         mqttConnect();
+//     }
+//     mqtt.loop();
+// }
 
 bool parseJSON(String data, float &temp, float &hum, int &soil)
 {

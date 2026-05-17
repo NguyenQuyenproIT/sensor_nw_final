@@ -15,6 +15,11 @@ String uartBuffer = "";
 
 void setup()
 {
+
+// tftInit();
+// drawStaticUI();
+// drawText(20, 170, "BOOTING", rgb565(255,255,255), rgb565(0,0,0), 3);
+
     Serial.begin(115200);
     Serial2.begin(UART_BAUD, SERIAL_8N1, UART_RX, UART_TX);
 
@@ -32,6 +37,36 @@ void setup()
 
     Serial.println("ESP32 AI READY");
 }
+
+// void setup()
+// {
+//     Serial.begin(115200);
+//     Serial.println("BOOT 1");
+
+//     Serial2.begin(UART_BAUD, SERIAL_8N1, UART_RX, UART_TX);
+//     Serial.println("BOOT 2");
+
+//     pinMode(LED_WARNING, OUTPUT);
+//     digitalWrite(LED_WARNING, HIGH);
+//     Serial.println("BOOT 3");
+
+//     tftInit();
+//     Serial.println("BOOT 4 TFT INIT OK");
+
+//     drawStaticUI();
+//     Serial.println("BOOT 5 UI DRAWN");
+
+//     wifiConnect();
+//     Serial.println("BOOT 6 WIFI DONE");
+
+//     mqttConnect();
+//     Serial.println("BOOT 7 MQTT DONE");
+
+//     drawStaticUI();
+//     drawText(20, 170, "ESP32 AI READY", rgb565(0,255,0), rgb565(0,0,0), 2);
+
+//     Serial.println("ESP32 AI READY");
+// }
 
 void loop()
 {

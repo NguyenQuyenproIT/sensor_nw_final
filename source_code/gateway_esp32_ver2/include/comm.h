@@ -14,6 +14,7 @@ extern bool manualLedOn;
 
 void wifiConnect();
 void mqttConnect();
+// bool mqttConnect();
 bool parseJSON(String data, float &temp, float &hum, int &soil);
 void sendToThingsBoard(float temp, float hum, int soil, float prediction, String ai_state, int led_state);
 void mqttLoop();
