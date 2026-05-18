@@ -26,7 +26,7 @@ static const float scaler_std[3] =
     LAYER 0 WEIGHTS
     Shape: (3 x 16)
 ========================================================*/
-
+// Đây là ma trận trọng số từ input layer sang hidden layer 1.
 static const float W1[3][16] =
 {
     {
@@ -54,7 +54,7 @@ static const float W1[3][16] =
 /*========================================================
     LAYER 0 BIAS
 ========================================================*/
-
+// bias thêm vào hidden 1
 static const float B1[16] =
 {
      0.00210071f,
@@ -79,7 +79,8 @@ static const float B1[16] =
     LAYER 1 WEIGHTS
     Shape: (16 x 8)
 ========================================================*/
-
+// Each neuron in hidden2 receive 16 neuron in hidden1
+// only receive neuron from hidden1 create
 static const float W2[16][8] =
 {
     {-0.17425438f,  0.04778523f, -0.38605906f,  0.33201462f, -0.39666399f,  0.45785683f,  0.24974683f, -0.26390833f},
@@ -103,7 +104,7 @@ static const float W2[16][8] =
 /*========================================================
     LAYER 1 BIAS
 ========================================================*/
-
+// bias of hidden2, each neuron receive a bias
 static const float B2[8] =
 {
      0.40546441f,
@@ -136,8 +137,7 @@ static const float W3[8] =
     LAYER 2 BIAS
 ========================================================*/
 
-static const float B3 =
-    -0.75731160f;
+static const float B3 = -0.75731160f;
 
 /*========================================================
     TANH ACTIVATION

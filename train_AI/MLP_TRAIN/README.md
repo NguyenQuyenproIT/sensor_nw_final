@@ -1,4 +1,23 @@
-# MLP_TRAIN - Hệ Thống Phân Loại Đất Bằng Mạng Neural MLP
+MLP_TRAIN pipeline - README
+
+Mục đích: huấn luyện MLP, kiểm tra, và xuất trọng số để nhúng vào firmware.
+
+Files:
+
+- `train_mlp.py` — script train (pandas, scikit-learn). Configure data path and model hyperparameters here.
+- `read_model.py` — nạp model + scaler, in thông tin.
+- `inspect_model.py` — inspect weights/bias để xuất sang C.
+- `requirements.txt` — (nên có) liệt kê pandas scikit-learn joblib numpy.
+
+Flow:
+
+1. Chuẩn bị CSV (repair header 'lable' → 'label' nếu cần).
+2. Chạy `train_mlp.py` → sinh `mlp_model.pkl`, `scaler.pkl`.
+3. Dùng `inspect_model.py` để xuất ma trận và vector.
+
+Gợi ý export:
+
+- Viết script tự động chuyển `mlp_model.pkl` + `scaler.pkl` → `mlp_model.c` & `mlp_model.h`.# MLP_TRAIN - Hệ Thống Phân Loại Đất Bằng Mạng Neural MLP
 
 > **Phần này hướng dẫn huấn luyện mô hình Multilayer Perceptron (MLP) để phân loại các loại đất dựa trên các cảm biến môi trường**
 

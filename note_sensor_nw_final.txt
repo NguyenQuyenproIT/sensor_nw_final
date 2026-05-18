@@ -1,10 +1,22 @@
 token thingsboard: dtyj50xqwdq3515biw9l
 
 ESP32: TX 17 - STM32 RX PA3
-	   RX 16 -       TX PA2
+       RX 16 -       TX PA2
 	 
 
 ///// STM 32 ////	
 	
 DHT22: PB12
 SOIL MOISTURE: PA0
+
+// =====================================================
+// TFT SPI PINS
+// =====================================================
+
+// GND  -> GND
+// VCC  -> 3V3
+// SCK  -> GPIO 18
+// SDA  -> GPIO 23
+// RES  -> GPIO 4
+// DC   -> GPIO 2
+// BLK  -> GPIO 15

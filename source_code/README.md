@@ -1,3 +1,16 @@
+Source code overview
+
+Thư mục `source_code/` chứa firmware nhúng cho cả hai board chính của dự án.
+
+Structure:
+
+- `gateway_esp32/` — firmware ESP32 (PlatformIO) chịu trách nhiệm làm gateway, inference MLP, MQTT.
+- `gateway_esp32_ver2/` — biến thể/phiên bản nâng cấp nếu có.
+- `soil_dht22_stm32/` — firmware STM32 đọc ADC và DHT22, xuất JSON qua UART.
+
+Hướng dẫn nhanh:
+
+- Xem các README cụ thể trong từng subfolder để biết cách build và cấu hình.
 **Sensor Networks — Source Code**
 
 Phiên bản: chuyên nghiệp, đầy đủ tài liệu (Tiếng Việt)
