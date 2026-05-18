@@ -53,11 +53,11 @@ Phiên bản: chuyên nghiệp, đầy đủ tài liệu (Tiếng Việt)
 **Sơ đồ tổng thể**
 ```mermaid
 graph LR
-  A[Node: STM32 (Soil + DHT22)] -->|UART/SERIAL| B[Gateway ESP32]
-  A -->|ADC| A2[Soil Sensor]
-  A -->|1-wire| A3[DHT22]
-  B -->|WiFi / MQTT / Serial| C[Server / PC]
-  B -->|I2C/SPI| D[Display]
+  A["Node: STM32 (Soil + DHT22)"] -->|"UART/SERIAL"| B["Gateway ESP32"]
+  A -->|"ADC"| A2["Soil Sensor"]
+  A -->|"1-wire"| A3["DHT22"]
+  B -->|"WiFi / MQTT / Serial"| C["Server / PC"]
+  B -->|"I2C/SPI"| D["Display"]
 ```
 
 **Hướng dẫn build & nạp firmware**
