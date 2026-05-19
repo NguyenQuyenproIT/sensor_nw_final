@@ -25,3 +25,7 @@ Hiển thị data trên dashboard
 Có điều khiển hẹn giờ bơm bao nhiêu giây
 Hẹn sau bao nhiêu giây nữa thì bơm bao nhiêu giây
 Có bơm thủ công - tắt AI
+
+
+có báo lỗi khi không nhận được data từ cảm biến
+100 frame giống nhau cũng là lỗi

@@ -6,6 +6,8 @@
 void tftInit();
 void drawStaticUI();
 void updateValues(float temp, float hum, int soil, const String &status);
+void showSensorError();
+void restoreNormalUI();
 
 // thêm 2 dòng này
 uint16_t rgb565(uint8_t r, uint8_t g, uint8_t b);
