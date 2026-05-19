@@ -20,3 +20,8 @@ SOIL MOISTURE: PA0
 // RES  -> GPIO 4
 // DC   -> GPIO 2
 // BLK  -> GPIO 15
+
+Hiển thị data trên dashboard
+Có điều khiển hẹn giờ bơm bao nhiêu giây
+Hẹn sau bao nhiêu giây nữa thì bơm bao nhiêu giây
+Có bơm thủ công - tắt AI
